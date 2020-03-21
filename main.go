@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -48,35 +47,21 @@ func main() {
 					menu.Redraw()
 					go func() {
 						for r := range a.Responses() {
+							log.Printf("response: %T%v", r, r)
 							switch r.(type) {
-							case RespMakeCase:
+							case Resp_MakeCase:
+								debugPrint("response %T%v", r, r)
 								SelectCurrentLine(editWin)
-								ReplaceSelection(editWin, fmt.Sprintf("%s\n", strings.Join(r.(RespMakeCase).Clauses, "\n")))
-							case RespDisplayInfo:
-								menu.DisplayInfo = r.(RespDisplayInfo).Info
+								ReplaceSelection(editWin, fmt.Sprintf("%s\n", strings.Join(r.(Resp_MakeCase).Clauses, "\n")))
+							case Resp_DisplayInfo:
+								debugPrint("response %T%v", r, r)
+								menu.DisplayInfo = r.(Resp_DisplayInfo).Info
 								menu.Error = nil
 								menu.Redraw()
-							case RespGiveAction:
-								respGiveAction := r.(RespGiveAction)
-								if goals, err := GoalRanges(editWin); err != nil {
-									log.Printf("error finding goals: %s", err)
-								} else {
-									goal := goals[respGiveAction.InteractionPoint]
-									if err := editWin.Addr("#%d,#%d", goal.Start, goal.End); err != nil {
-										log.Printf("error writing goal address: %s", err)
-									} else {
-										if err := editWin.Ctl("dot=addr"); err != nil {
-											log.Printf("error moving to goal: %s", err)
-										} else {
-											ReplaceSelection(editWin, respGiveAction.GiveResult)
-										}
-									}
-								}
-							case RespJumpToError:
-								log.Printf("%v", r)
-								respJumpToError := r.(RespJumpToError)
-								menu.Error = errors.New(fmt.Sprintf("Error at %s:#%d", respJumpToError.FilePath, respJumpToError.Position))
-								menu.Redraw()
+							case Resp_GiveAction:
+								debugPrint("response %T%v", r, r)
+							case Resp_JumpToError:
+								debugPrint("response %T%v", r, r)
 							default:
 								debugPrint("unknown response: %T %v", r, r)
 							}

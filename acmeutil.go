@@ -11,7 +11,7 @@ import (
 )
 
 type Range struct {
-	Start int
+Start int
 	End   int
 }
 
@@ -70,13 +70,16 @@ func SelectGoal(win *acme.Win) error {
 	}
 	return win.Ctl("show")
 }
+
+const goalAddress = `/( \?( |$)|{!.*!})`
+
 func GoalRanges(win *acme.Win) ([]Range, error) {
 	err := win.Addr("#0")
 	if err != nil {
 		return nil, err
 	}
 	prevStart := 0
-	err = win.Addr(`/(\?|{!.*!})`)
+	err = win.Addr(goalAddress)
 	if err != nil {
 		return nil, errors.New("no goal found")
 	}
@@ -88,7 +91,7 @@ func GoalRanges(win *acme.Win) ([]Range, error) {
 	for prevStart < start {
 		ranges = append(ranges, Range{Start: start, End: end})
 		prevStart = start
-		err = win.Addr(`/(\?|{!.*!})`)
+		err = win.Addr(goalAddress)
 		if err != nil {
 			return nil, err
 		}
@@ -106,7 +109,7 @@ func NextGoal(win *acme.Win) error {
 	if err != nil {
 		return err
 	}
-	err = win.Addr(`/(\?|{!.*!})`) // The regex might not be correct every time, but for now we hope it suffice.
+	err = win.Addr(goalAddress) // The regex might not be correct every time, but for now we hope it suffice.
 	if err != nil {
 		return err
 	}

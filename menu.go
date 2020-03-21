@@ -13,12 +13,13 @@ import (
 
 const menuText = `Get Case Refine Next Goal
 
-{{template "displayInfo" .DisplayInfo}}
+{{ template "displayInfo" .DisplayInfo}}
 {{ with .Error }}{{ .Error }}{{ end }}
 
 {{ define "displayInfo" }}{{ with .Goals}}Goals:
 {{ . }}{{ end }}{{ with .Warnings}}Warnings:
 {{ . }}{{ end }}{{ with .Errors}}Errors:
+{{ . }}{{ end }}{{ with .Message}}Message:
 {{ . }}{{ end }}{{ with .Payload}}Payload:
 {{ . }}{{ end }}{{ end }}
 `
