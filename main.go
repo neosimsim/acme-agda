@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -48,37 +47,41 @@ func main() {
 					menu.Redraw()
 					go func() {
 						for r := range a.Responses() {
+							debugPrint("response %T%v", r, r)
 							switch r.(type) {
-							case RespMakeCase:
-								SelectCurrentLine(editWin)
-								ReplaceSelection(editWin, fmt.Sprintf("%s\n", strings.Join(r.(RespMakeCase).Clauses, "\n")))
-							case RespDisplayInfo:
-								menu.DisplayInfo = r.(RespDisplayInfo).Info
+							case Resp_MakeCase:
+								makeCase := r.(Resp_MakeCase)
+								line := makeCase.InteractionPoint.Range[0].Start.Line
+								if err := editWin.Addr("%d", line); err != nil {
+									log.Printf("could write read addr for MakeCase: %s", err)
+								} else {
+									clauses := strings.Join(makeCase.Clauses, "\n") + "\n"
+									if _, err := editWin.Write("data", []byte(clauses)); err != nil {
+										log.Printf("could write result of GiveAction: %s", err)
+									}
+								}
+							case Resp_DisplayInfo:
+								menu.DisplayInfo = r.(Resp_DisplayInfo).Info
 								menu.Error = nil
 								menu.Redraw()
-							case RespGiveAction:
-								respGiveAction := r.(RespGiveAction)
-								if goals, err := GoalRanges(editWin); err != nil {
-									log.Printf("error finding goals: %s", err)
-								} else {
-									goal := goals[respGiveAction.InteractionPoint]
-									if err := editWin.Addr("#%d,#%d", goal.Start, goal.End); err != nil {
-										log.Printf("error writing goal address: %s", err)
+							case Resp_GiveAction:
+								giveAction := r.(Resp_GiveAction)
+								if giveAction.GiveResult.Str != "" {
+									start := giveAction.InteractionPoint.Range[0].Start.Pos
+									end := giveAction.InteractionPoint.Range[0].End.Pos
+									if err := editWin.Addr("#%d,#%d", start-1, end-1); err != nil {
+										log.Printf("could not write addr for GiveAction: %s", err)
 									} else {
-										if err := editWin.Ctl("dot=addr"); err != nil {
-											log.Printf("error moving to goal: %s", err)
-										} else {
-											ReplaceSelection(editWin, respGiveAction.GiveResult)
+										if _, err := editWin.Write("data", []byte(giveAction.GiveResult.Str)); err != nil {
+											log.Printf("could Write result of GiveAction: %s", err)
 										}
 									}
 								}
-							case RespJumpToError:
-								log.Printf("%v", r)
-								respJumpToError := r.(RespJumpToError)
-								menu.Error = errors.New(fmt.Sprintf("Error at %s:#%d", respJumpToError.FilePath, respJumpToError.Position))
-								menu.Redraw()
+							case Resp_InteractionPoints:
+								menu.InteractionPoints = r.(Resp_InteractionPoints).InteractionPoints
+							case Resp_JumpToError:
 							default:
-								debugPrint("unknown response: %T %v", r, r)
+								debugPrint("unhandled response: %T %v", r, r)
 							}
 						}
 					}()

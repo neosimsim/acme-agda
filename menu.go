@@ -13,23 +13,27 @@ import (
 
 const menuText = `Get Case Refine Next Goal
 
-{{template "displayInfo" .DisplayInfo}}
+{{ template "displayInfo" .DisplayInfo}}
 {{ with .Error }}{{ .Error }}{{ end }}
 
-{{ define "displayInfo" }}{{ with .Goals}}Goals:
-{{ . }}{{ end }}{{ with .Warnings}}Warnings:
+{{ define "displayInfo" }}{{ with .Warnings}}Warnings:
 {{ . }}{{ end }}{{ with .Errors}}Errors:
-{{ . }}{{ end }}{{ with .Payload}}Payload:
-{{ . }}{{ end }}{{ end }}
-`
+{{ . }}{{ end }}{{ with .Message}}Message:
+{{ . }}{{ end }}{{ with .InvisibleGoals}}InvisibleGoals:
+{{ range . }}{{ template "outputConstraint" . }}{{ end }}{{ end }}{{ with .VisibleGoals}}VisibleGoals:
+{{ range . }}{{ template "outputConstraint" . }}{{ end }}{{ end }}{{ end }}
+
+{{ define "outputConstraint" }}?{{ .ConstraintObj }} : {{ .Type }}
+{{ end }}`
 
 type Menu struct {
-	menuWin         *acme.Win
-	agdaWin         *acme.Win
-	template        *template.Template
-	agdaInteraction *Agda
-	DisplayInfo     DisplayInfo
-	Error           error
+	menuWin           *acme.Win
+	agdaWin           *acme.Win
+	template          *template.Template
+	agdaInteraction   *Agda
+	DisplayInfo       Info_Union
+	InteractionPoints []InteractionId
+	Error             error
 }
 
 func NewMenu(agdaInteraction *Agda, agdaWin *acme.Win) (*Menu, error) {
@@ -84,71 +88,34 @@ func (menu *Menu) Loop() {
 					}
 					os.Exit(0)
 				case "Get":
+					debugPrint("loading file")
 					if err := menu.agdaWin.Ctl("put"); err != nil {
 						log.Printf("could save file: %s", err)
 					}
-					if err := menu.agdaInteraction.LoadFile(); err != nil {
+					if err := menu.agdaInteraction.Load(); err != nil {
 						log.Printf("could not load file: %s", err)
 					}
 				case "Case":
-					if err := SelectGoal(menu.agdaWin); err != nil {
-						log.Printf("could not select goal: %s", err)
-						return
-					}
-					start, end, err := menu.agdaWin.ReadAddr()
+					debugPrint("doing case split")
+					interactionId, goalContent, err := menu.SelectedInteraction()
 					if err != nil {
-						log.Printf("could not read select goal address: %s", err)
+						debugPrint("move dot inside a goal: %s", err)
+						menu.Error = errors.New("Move dot inside a goal. Have you loaded the file?")
 						return
 					}
-					goalRanges, err := GoalRanges(menu.agdaWin)
-					if err != nil {
-						log.Printf("could not get goal rages: %s", err)
-						return
-					}
-					goalIdx := -1
-					for i, goalRange := range goalRanges {
-						if goalRange.Start == start && goalRange.End == end {
-							goalIdx = i
-							break
-						}
-					}
-					if goalIdx == -1 {
-						log.Printf("move dot inside a goal")
-					}
-					goalContent := menu.agdaWin.Selection()
-					goalContent = goalContent[2 : len(goalContent)-2] // drop {! and !}
-					if err := menu.agdaInteraction.CaseSplit(goalIdx, goalContent); err != nil {
-						log.Printf("could not load file: %s", err)
+					if err := menu.agdaInteraction.MakeCase(interactionId.Id, goalContent); err != nil {
+						log.Printf("could not MakeCase: %s", err)
 					}
 				case "Refine":
-					if err := SelectGoal(menu.agdaWin); err != nil {
-						log.Printf("could not select goal: %s", err)
-						return
-					}
-					start, end, err := menu.agdaWin.ReadAddr()
+					debugPrint("refine goal")
+					interactionId, goalContent, err := menu.SelectedInteraction()
 					if err != nil {
-						log.Printf("could not read select goal address: %s", err)
+						debugPrint("move dot inside a goal: %s", err)
+						menu.Error = errors.New("Move dot inside a goal. Have you loaded the file?")
 						return
 					}
-					goalRanges, err := GoalRanges(menu.agdaWin)
-					if err != nil {
-						log.Printf("could not get goal rages: %s", err)
-						return
-					}
-					goalIdx := -1
-					for i, goalRange := range goalRanges {
-						if goalRange.Start == start && goalRange.End == end {
-							goalIdx = i
-							break
-						}
-					}
-					if goalIdx == -1 {
-						log.Printf("move dot inside a goal")
-					}
-					goalContent := menu.agdaWin.Selection()
-					goalContent = goalContent[2 : len(goalContent)-2] // drop {! and !}
-					if err := menu.agdaInteraction.RefineHole(goalIdx, goalContent); err != nil {
-						log.Printf("could not load file: %s", err)
+					if err := menu.agdaInteraction.Refine(interactionId.Id, goalContent); err != nil {
+						log.Printf("could not Refine goal: %s", err)
 					}
 				case "Next":
 					NextGoal(menu.agdaWin)
@@ -157,7 +124,6 @@ func (menu *Menu) Loop() {
 				default:
 					menu.menuWin.WriteEvent(event)
 				}
-
 			default:
 				menu.menuWin.WriteEvent(event)
 			}
@@ -167,4 +133,28 @@ func (menu *Menu) Loop() {
 
 func (menu *Menu) Close() {
 	menu.menuWin.CloseFiles()
+}
+
+func (menu *Menu) SelectedInteraction() (interactionPoint InteractionId, interactionContent string, err error) {
+	// which goal is hit by selection?
+	interactionPoint, err = SelectedInteractionPoint(menu.agdaWin, menu.InteractionPoints)
+	if err != nil {
+		err = fmt.Errorf("move dot inside a goal: %w", err)
+		return
+	}
+	debugPrint("set address to #%d,#%d", interactionPoint.Range[0].Start.Pos-1, interactionPoint.Range[0].End.Pos-1)
+	err = menu.agdaWin.Addr("#%d,#%d", interactionPoint.Range[0].Start.Pos-1, interactionPoint.Range[0].End.Pos-1)
+	if err != nil {
+		err = fmt.Errorf("could not set interactionPoint address: %s", err)
+		return
+	}
+	err = menu.agdaWin.Ctl("dot=addr")
+	if err != nil {
+		err = fmt.Errorf("could set dot to interactionPoint: %s", err)
+		return
+	}
+	debugPrint("read selection")
+	interactionContent = menu.agdaWin.Selection()
+	interactionContent = interactionContent[2 : len(interactionContent)-2] // drop {! and !}
+	return
 }

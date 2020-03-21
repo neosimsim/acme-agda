@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -19,8 +18,6 @@ type Agda struct {
 	stdin     io.WriteCloser
 	responses <-chan Response
 }
-
-type Response interface{}
 
 func NewAgda(agdaCmdPath, filename string) (*Agda, error) {
 	agdaCmd := exec.Command(agdaCmdPath, "--interaction-json")
@@ -62,132 +59,56 @@ func (a *Agda) Responses() <-chan Response {
 	return a.responses
 }
 
-func (a *Agda) writeCommand(cmd string) error {
+func (a *Agda) writeCommand(cmdFmt string, vals ...interface{}) error {
 	cmdString := fmt.Sprintf(`IOTCM "%s" None Direct (%s)
-`, a.filename, cmd) // The new line is important
+`, a.filename, fmt.Sprintf(cmdFmt, vals...)) // The new line is important
 	debugPrint("sending command: %s", cmdString)
 	_, err := io.WriteString(a.stdin, cmdString)
 	return err
 }
-func (a *Agda) LoadFile(args ...string) error {
-	return a.writeCommand(fmt.Sprintf(`Cmd_load "%s" [%s]`, a.filename, strings.Join(args, ",")))
+
+func (a *Agda) Load(args ...string) error {
+	return a.writeCommand(`Cmd_load "%s" [%s]`, a.filename, strings.Join(args, ","))
 }
 
-func (a *Agda) CaseSplit(goalIdx int, varName string) error {
-	return a.writeCommand(fmt.Sprintf(`Cmd_make_case %d noRange "%s"`, goalIdx, varName))
+func (a *Agda) Compile(args ...string) error {
+	return a.writeCommand(`Cmd_compile agda "%s" [%s]`, a.filename, strings.Join(args, ","))
 }
 
-func (a *Agda) RefineHole(goalIdx int, content string) error {
-	return a.writeCommand(fmt.Sprintf(`Cmd_refine %d noRange "%s"`, goalIdx, content))
+func (a *Agda) Constraints() error {
+	return a.writeCommand("Cmd_constraints")
 }
 
-func (*Agda) Kill() {
+func (a *Agda) Metas() error {
+	return a.writeCommand("Cmd_metas")
 }
 
-type InteractionId uint
-type RespMakeCase struct {
-	Variant string
-	// Lines which replace the line of the goal.
-	Clauses []string
+func (a *Agda) ShowModule(moduleName string) error {
+	return a.writeCommand(`Cmd_show_module_contents_toplevel AsIs "%s"`, moduleName)
 }
 
-type DisplayInfo struct {
-	Goals    string
-	Warnings string
-	Errors   string
-	Payload  string
+func (a *Agda) SolveAll() error {
+	return a.writeCommand(`Cmd_solveAll AsIs`)
 }
 
-type RespDisplayInfo struct {
-	Info DisplayInfo
+func (a *Agda) SolveOne(goalIdx uint, arg string) error {
+	return a.writeCommand(`Cmd_solveOne AsIs %d noRange "%s"`, goalIdx, arg)
 }
 
-// TODO remove Kind
-type RespClearHighlighting struct{}
-type RespDoneAborting struct{}
-type RespClearRunningInfo struct{}
-type RespRunningInfo struct {
-	kind       string
-	debugLevel int
-	message    string
-}
-type RespStatus struct {
-	kind string
-
-	// Are implicit arguments displayed
-	showImplicitArguments bool
-
-	// Has the module been successfully type checked?
-	Checked bool
-}
-type RespJumpToError struct {
-	FilePath string
-	Position int32
+func (a *Agda) AutoAll() error {
+	return a.writeCommand(`Cmd_autoAll AsIs`)
 }
 
-type RespInteractionPoints struct {
-	interactionPoints []InteractionId
-}
-type RespGiveAction struct {
-	InteractionPoint InteractionId
-	GiveResult       string // FIXME might also be a bool
+func (a *Agda) AutoOne(goalIdx uint, arg string) error {
+	return a.writeCommand(`Cmd_autoOne AsIs %d noRange "%s"`, goalIdx, arg)
 }
 
-type RespSolveAll struct {
-	solutions map[InteractionId]string
+// ...
+
+func (a *Agda) MakeCase(goalIdx uint, arg string) error {
+	return a.writeCommand(`Cmd_make_case %d noRange "%s"`, goalIdx, arg)
 }
 
-func parseResponse(response string) (Response, error) {
-	debugPrint("parsing: %s", response)
-	var resp map[string]interface{}
-	if err := json.Unmarshal([]byte(response), &resp); err != nil {
-		return nil, err
-	} else {
-		debugPrint("parsing intermediate map: %v", resp)
-		switch resp["kind"] {
-		case "DisplayInfo":
-			var respDisplayInfo RespDisplayInfo
-			if err := json.Unmarshal([]byte(response), &respDisplayInfo); err != nil {
-				return nil, err
-			} else {
-				return respDisplayInfo, nil
-			}
-		case "ClearHighlighting":
-			return RespClearHighlighting{}, nil
-		case "DoneAborting":
-			return RespDoneAborting{}, nil
-		case "ClearRunningInfo":
-			return RespClearRunningInfo{}, nil
-		case "RunningInfo":
-			return RespRunningInfo{}, nil
-		case "Status":
-			return RespStatus{}, nil
-		case "JumpToError":
-			var respJumpToError RespJumpToError
-			if err := json.Unmarshal([]byte(response), &respJumpToError); err != nil {
-				return nil, err
-			} else {
-				return respJumpToError, nil
-			}
-		case "InteractionPoints":
-			return RespInteractionPoints{}, nil
-		case "GiveAction":
-			var respGiveAction RespGiveAction
-			if err := json.Unmarshal([]byte(response), &respGiveAction); err != nil {
-				return nil, err
-			} else {
-				return respGiveAction, nil
-			}
-		case "MakeCase":
-			var respMakeCase RespMakeCase
-			if err := json.Unmarshal([]byte(response), &respMakeCase); err != nil {
-				return nil, err
-			} else {
-				return respMakeCase, nil
-			}
-		case "SolveAll":
-			return RespSolveAll{}, nil
-		}
-		return nil, nil
-	}
+func (a *Agda) Refine(goalId uint, content string) error {
+	return a.writeCommand(`Cmd_refine %d noRange "%s"`, goalId, content)
 }

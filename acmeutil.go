@@ -1,9 +1,10 @@
-// Provides convenient funcitons to select and edit text
-// in an Acme window.
+// Provides functions to select and edit text in an Acme window.
 package main
 
 import (
 	"errors"
+	"fmt"
+	"log"
 	"os"
 	"strconv"
 
@@ -38,67 +39,7 @@ func WindowName(win *acme.Win) (string, error) {
 	}
 }
 
-func SelectCurrentLine(win *acme.Win) error {
-	err := win.Ctl("addr=dot")
-	if err != nil {
-		return err
-	}
-	err = win.Addr("-+")
-	if err != nil {
-		return err
-	}
-	err = win.Ctl("dot=addr")
-	if err != nil {
-		return err
-	}
-	return win.Ctl("show")
-}
-
-// Select the goal "under the cursor". Using backwords and forward search from dot.
-func SelectGoal(win *acme.Win) error {
-	err := win.Ctl("addr=dot")
-	if err != nil {
-		return err
-	}
-	err = win.Addr(`-/{!/,/!}/`) // The regex might not be correct every time, but for now we hope it suffice.
-	if err != nil {
-		return err
-	}
-	err = win.Ctl("dot=addr")
-	if err != nil {
-		return err
-	}
-	return win.Ctl("show")
-}
-func GoalRanges(win *acme.Win) ([]Range, error) {
-	err := win.Addr("#0")
-	if err != nil {
-		return nil, err
-	}
-	prevStart := 0
-	err = win.Addr(`/(\?|{!.*!})`)
-	if err != nil {
-		return nil, errors.New("no goal found")
-	}
-	start, end, err := win.ReadAddr()
-	if err != nil {
-		return nil, err
-	}
-	ranges := make([]Range, 0, 10)
-	for prevStart < start {
-		ranges = append(ranges, Range{Start: start, End: end})
-		prevStart = start
-		err = win.Addr(`/(\?|{!.*!})`)
-		if err != nil {
-			return nil, err
-		}
-		start, end, err = win.ReadAddr()
-		if err != nil {
-			return nil, err
-		}
-	}
-	return ranges, nil
-}
+const goalAddress = `/( \?( |$)|{!.*!})`
 
 // Sets dot to the the next goal
 func NextGoal(win *acme.Win) error {
@@ -106,7 +47,7 @@ func NextGoal(win *acme.Win) error {
 	if err != nil {
 		return err
 	}
-	err = win.Addr(`/(\?|{!.*!})`) // The regex might not be correct every time, but for now we hope it suffice.
+	err = win.Addr(goalAddress) // The regex might not be correct every time, but for now we hope it suffice.
 	if err != nil {
 		return err
 	}
@@ -130,4 +71,25 @@ func ReplaceSelection(win *acme.Win, text string) error {
 // time has no effect. After calling this function everything works as I expect.
 func ResetAddr(win *acme.Win) error {
 	return win.Addr("#0")
+}
+
+// Returns the InteractionPoint which is selected by dot, i.e dot is completely included in the range of the interaction point.
+// Sets addr to dot.
+func SelectedInteractionPoint(win *acme.Win, interactionPoints []InteractionId) (InteractionId, error) {
+	if err := win.Ctl("addr=dot"); err != nil {
+		return InteractionId{}, errors.New(fmt.Sprintf("could not set addr to dot %s", err))
+	}
+	selectionStart, selectionEnd, err := win.ReadAddr()
+	debugPrint("lookup goal selected by %d %d", selectionStart, selectionEnd)
+	if err != nil {
+		log.Printf("could not read select goal address: %s", err)
+		return InteractionId{}, err
+	}
+	for _, interactionPoint := range interactionPoints {
+		debugPrint("comparing interactionPoint with Range %T%v", interactionPoint.Range, interactionPoint.Range)
+		if interactionPoint.Range[0].Start.Pos-1 <= selectionStart && selectionEnd <= interactionPoint.Range[0].End.Pos-1 {
+			return interactionPoint, nil
+		}
+	}
+	return InteractionId{}, errors.New("No interaction point selected. Maybe you need to reload the file.")
 }
