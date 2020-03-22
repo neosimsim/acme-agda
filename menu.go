@@ -45,7 +45,7 @@ func NewMenu(agdaInteraction *Agda, agdaWin *acme.Win) (*Menu, error) {
 	if err != nil {
 		return nil, errors.Unwrap(fmt.Errorf("cannot get current directory: %w", err))
 	}
-	if err = menu.menuWin.Name("%s+Acme", currentWorkingDirectory); err != nil {
+	if err = menu.menuWin.Name("%s/+Acme", currentWorkingDirectory); err != nil {
 		return nil, errors.Unwrap(fmt.Errorf("cannot set acme menuWindow name: %w", err))
 	}
 	menu.agdaInteraction = agdaInteraction
