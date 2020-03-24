@@ -1,5 +1,12 @@
 # acme-agda
-[Agda Interaction Mode](https://agda.readthedocs.io/en/v2.6.1/tools/emacs-mode.html) for [Acme](http://acme.cat-v.org/)
+[Agda Interaction Mode](https://agda.readthedocs.io/en/v2.6.1/tools/emacs-mode.html) for [Acme](http://acme.cat-v.org/).
+Testet with
+
+-	Agda v2.6.1
+
+## Installation
+
+	go get gitlab.com/neosimsim/acme-agda
 
 You might want to add
 
@@ -12,3 +19,10 @@ You might want to add
 	plumb client $editor
 
 to your plumbing rules.
+
+## Features
+Support the following Agda interaction features
+
+-	MakeCase
+-	Refine
+-	AutoOne

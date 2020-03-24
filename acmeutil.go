@@ -93,3 +93,31 @@ func SelectedInteractionPoint(win *acme.Win, interactionPoints []InteractionId) 
 	}
 	return InteractionId{}, errors.New("No interaction point selected. Maybe you need to reload the file.")
 }
+
+func SelectedInteraction(win *acme.Win, interactionPoints []InteractionId) (interactionPoint InteractionId, interactionContent string, err error) {
+	// which goal is hit by selection?
+	interactionPoint, err = SelectedInteractionPoint(win, interactionPoints)
+	if err != nil {
+		err = fmt.Errorf("move dot inside a goal: %w", err)
+		return
+	}
+	debugPrint("set address to #%d,#%d", interactionPoint.Range[0].Start.Pos-1, interactionPoint.Range[0].End.Pos-1)
+	err = win.Addr("#%d,#%d", interactionPoint.Range[0].Start.Pos-1, interactionPoint.Range[0].End.Pos-1)
+	if err != nil {
+		err = fmt.Errorf("could not set interactionPoint address: %s", err)
+		return
+	}
+	err = win.Ctl("dot=addr")
+	if err != nil {
+		err = fmt.Errorf("could set dot to interactionPoint: %s", err)
+		return
+	}
+	debugPrint("read selection")
+	interactionContent = win.Selection()
+	if interactionContent == "?" {
+		interactionContent = ""
+	} else {
+		interactionContent = interactionContent[2 : len(interactionContent)-2] // drop {! and !}
+	}
+	return
+}

@@ -100,7 +100,7 @@ func (a *Agda) AutoAll() error {
 }
 
 func (a *Agda) AutoOne(goalIdx uint, arg string) error {
-	return a.writeCommand(`Cmd_autoOne AsIs %d noRange "%s"`, goalIdx, arg)
+	return a.writeCommand(`Cmd_autoOne %d noRange "%s"`, goalIdx, arg)
 }
 
 // ...

@@ -11,7 +11,7 @@ import (
 	"9fans.net/go/acme"
 )
 
-const menuText = `Get Case Refine Next Goal
+const menuText = `Get Case Refine AutoOne Next Goal
 
 {{ template "displayInfo" .DisplayInfo}}
 {{ with .Error }}{{ .Error }}{{ end }}
@@ -97,10 +97,11 @@ func (menu *Menu) Loop() {
 					}
 				case "Case":
 					debugPrint("doing case split")
-					interactionId, goalContent, err := menu.SelectedInteraction()
+					interactionId, goalContent, err := SelectedInteraction(menu.agdaWin, menu.InteractionPoints)
 					if err != nil {
 						debugPrint("move dot inside a goal: %s", err)
 						menu.Error = errors.New("Move dot inside a goal. Have you loaded the file?")
+						menu.Redraw()
 						return
 					}
 					if err := menu.agdaInteraction.MakeCase(interactionId.Id, goalContent); err != nil {
@@ -108,13 +109,26 @@ func (menu *Menu) Loop() {
 					}
 				case "Refine":
 					debugPrint("refine goal")
-					interactionId, goalContent, err := menu.SelectedInteraction()
+					interactionId, goalContent, err := SelectedInteraction(menu.agdaWin, menu.InteractionPoints)
 					if err != nil {
 						debugPrint("move dot inside a goal: %s", err)
 						menu.Error = errors.New("Move dot inside a goal. Have you loaded the file?")
+						menu.Redraw()
 						return
 					}
 					if err := menu.agdaInteraction.Refine(interactionId.Id, goalContent); err != nil {
+						log.Printf("could not Refine goal: %s", err)
+					}
+				case "AutoOne":
+					debugPrint("running AutoOne on goal")
+					interactionId, goalContent, err := SelectedInteraction(menu.agdaWin, menu.InteractionPoints)
+					if err != nil {
+						debugPrint("move dot inside a goal: %s", err)
+						menu.Error = errors.New("Move dot inside a goal. Have you loaded the file?")
+						menu.Redraw()
+						return
+					}
+					if err := menu.agdaInteraction.AutoOne(interactionId.Id, goalContent); err != nil {
 						log.Printf("could not Refine goal: %s", err)
 					}
 				case "Next":
@@ -133,28 +147,4 @@ func (menu *Menu) Loop() {
 
 func (menu *Menu) Close() {
 	menu.menuWin.CloseFiles()
-}
-
-func (menu *Menu) SelectedInteraction() (interactionPoint InteractionId, interactionContent string, err error) {
-	// which goal is hit by selection?
-	interactionPoint, err = SelectedInteractionPoint(menu.agdaWin, menu.InteractionPoints)
-	if err != nil {
-		err = fmt.Errorf("move dot inside a goal: %w", err)
-		return
-	}
-	debugPrint("set address to #%d,#%d", interactionPoint.Range[0].Start.Pos-1, interactionPoint.Range[0].End.Pos-1)
-	err = menu.agdaWin.Addr("#%d,#%d", interactionPoint.Range[0].Start.Pos-1, interactionPoint.Range[0].End.Pos-1)
-	if err != nil {
-		err = fmt.Errorf("could not set interactionPoint address: %s", err)
-		return
-	}
-	err = menu.agdaWin.Ctl("dot=addr")
-	if err != nil {
-		err = fmt.Errorf("could set dot to interactionPoint: %s", err)
-		return
-	}
-	debugPrint("read selection")
-	interactionContent = menu.agdaWin.Selection()
-	interactionContent = interactionContent[2 : len(interactionContent)-2] // drop {! and !}
-	return
 }
