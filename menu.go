@@ -12,16 +12,18 @@ import (
 )
 
 const menuText = `Get Case Refine AutoOne Next Goal
+GoalType
 
-{{ template "displayInfo" .DisplayInfo}}
-{{ with .Error }}{{ .Error }}{{ end }}
-
-{{ define "displayInfo" }}{{ with .Warnings}}Warnings:
+{{ with .DisplayInfo}}{{ with .Warnings}}Warnings:
 {{ . }}{{ end }}{{ with .Errors}}Errors:
 {{ . }}{{ end }}{{ with .Message}}Message:
 {{ . }}{{ end }}{{ with .InvisibleGoals}}InvisibleGoals:
 {{ range . }}{{ template "outputConstraint" . }}{{ end }}{{ end }}{{ with .VisibleGoals}}VisibleGoals:
-{{ range . }}{{ template "outputConstraint" . }}{{ end }}{{ end }}{{ end }}
+{{ range . }}{{ template "outputConstraint" . }}{{ end }}{{ end }}
+{{ with .InteractionPoint }}InteractionPoint {{ .Id }}:{{ range .Range }}
+{{ $.AgdaFile }}:#{{ decr .Start.Pos }},#{{ decr .End.Pos }}{{ end }}{{ end }}
+{{ with .GoalInfo }}{{.Type}}{{ end }}{{ end }}
+{{ with .Error }}{{ .Error }}{{ end }}
 
 {{ define "outputConstraint" }}?{{ .ConstraintObj }} : {{ .Type }}
 {{ end }}`
@@ -34,16 +36,26 @@ type Menu struct {
 	DisplayInfo       Info_Union
 	InteractionPoints []InteractionId
 	Error             error
+	AgdaFile          string
 }
 
 func NewMenu(agdaInteraction *Agda, agdaWin *acme.Win) (*Menu, error) {
 	var menu Menu
 	var err error
-	if menu.template, err = template.New("menu").Parse(menuText); err != nil {
+
+	funcMap := template.FuncMap{
+		"decr": func(i int) int {
+			return i - 1
+		},
+	}
+	if menu.template, err = template.New("menu").Funcs(funcMap).Parse(menuText); err != nil {
 		return nil, errors.Unwrap(fmt.Errorf("cannot parse menu templates: %w", err))
 	}
 	if menu.menuWin, err = acme.New(); err != nil {
 		return nil, errors.Unwrap(fmt.Errorf("cannot open new acme menuWindow: %w", err))
+	}
+	if menu.AgdaFile, err = WindowName(agdaWin); err != nil {
+		return nil, errors.Unwrap(fmt.Errorf("cannot read Agda file from window name: %w", err))
 	}
 	currentWorkingDirectory, err := os.Getwd()
 	if err != nil {
@@ -130,6 +142,18 @@ func (menu *Menu) Loop() {
 					}
 					if err := menu.agdaInteraction.AutoOne(interactionId.Id, goalContent); err != nil {
 						log.Printf("could not Refine goal: %s", err)
+					}
+				case "GoalType":
+					debugPrint("running GoalType")
+					interactionId, _, err := SelectedInteraction(menu.agdaWin, menu.InteractionPoints)
+					if err != nil {
+						debugPrint("move dot inside a goal: %s", err)
+						menu.Error = errors.New("Move dot inside a goal. Have you loaded the file?")
+						menu.Redraw()
+						return
+					}
+					if err := menu.agdaInteraction.GoalType(interactionId.Id); err != nil {
+						log.Printf("could not call for goal type: %s", err)
 					}
 				case "Next":
 					NextGoal(menu.agdaWin)

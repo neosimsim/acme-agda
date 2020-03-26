@@ -169,7 +169,8 @@ type OutputForm struct {
 	Constraint OutputConstraint
 }
 
-type ConstraintObj int
+// uint for visibleGoals and string for invisibleGoals
+type ConstraintObj interface{}
 
 type OutputConstraint struct {
 	Kind           string
@@ -295,7 +296,7 @@ type Info_GoalSpecific struct {
 // Combines attributes of all Info_ struct for easier access.
 // Less type safe.
 type Info_Union struct {
-	Kind	string
+	Kind             string
 	CommandState     CommandState
 	ComputeMode      ComputeMode
 	Constraints      []OutputForm
@@ -304,9 +305,9 @@ type Info_Union struct {
 	Errors           string
 	Expr             string
 	Filepath         string
-	GoalInfo         GoalDisplayInfo
+	GoalInfo         Goal_Union
 	Info             Info
-	InteractionPoint InteractionId
+	InteractionPoint *InteractionId
 	InvisibleGoals   []OutputConstraint
 	Message          string
 	Name             Name
@@ -349,6 +350,17 @@ type Goal_CurrentGoal struct {
 
 type Goal_InferredType struct {
 	Expr string
+}
+
+type Goal_Union struct {
+	Boundary    []string
+	ComputeMode ComputeMode
+	Expr        string
+	OutputForms []string
+	Rewrite     string
+	Signature   interface{}
+	TypeAux     interface{}
+	Type        string
 }
 
 type Response interface{}

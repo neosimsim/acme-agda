@@ -103,6 +103,22 @@ func (a *Agda) AutoOne(goalIdx uint, arg string) error {
 	return a.writeCommand(`Cmd_autoOne %d noRange "%s"`, goalIdx, arg)
 }
 
+const (
+	RewriteAsIs         = "AsIs"
+	RewriteInstantiated = "Instantiated"
+	RewriteHeadNormal   = "HeadNormal"
+	RewriteSimplified   = "Simplified"
+	RewriteNormalised   = "Normalised"
+)
+
+func (a *Agda) GoalType(goalIdx uint) error {
+	return a.writeCommand(`Cmd_goal_type %s %d noRange ""`, RewriteSimplified, goalIdx)
+}
+
+func (a *Agda) GoalTypeContext(goalIdx uint) error {
+	return a.writeCommand(`Cmd_goal_type_context %s %d noRange ""`, RewriteSimplified, goalIdx)
+}
+
 // ...
 
 func (a *Agda) MakeCase(goalIdx uint, arg string) error {
